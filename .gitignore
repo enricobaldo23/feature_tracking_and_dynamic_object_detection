@@ -5,6 +5,7 @@ CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 Makefile
+detections.txt
 *.o
 *.exe
 *.out

@@ -1,67 +1,52 @@
 #include "motion.hpp"
 #include <opencv2/video.hpp>
 #include <opencv2/imgproc.hpp>
-#include <iostream>
-
+#include <algorithm>
 
 using namespace std;
 using namespace cv;
 
-Rect motion::detectMovingObject(vector<Mat> frames) {
-    if (frames.size() < 2) return Rect();
+Rect MotionDetector::detectMovingObject(vector<Mat> frames) {
 
-    Mat prevGray;
-    cvtColor(frames[0], prevGray, COLOR_BGR2GRAY);
+    if (frames.size() < 2) {
+        return Rect(0, 0, 0, 0); //if we have only one frame we can't detect motion
+    }
 
-    // 1. Detect interesting points on the first frame
-    vector<Point2f> initialPoints;
-    goodFeaturesToTrack(prevGray, initialPoints, 500, 0.01, 10);
+    Mat grayFirst, grayMid; //we consider the first and middle frame
 
-    if (initialPoints.empty()) return Rect();
+    cvtColor(frames.front(), grayFirst, COLOR_BGR2GRAY);       //convert in grayscale
+    cvtColor(frames[frames.size()/2], grayMid, COLOR_BGR2GRAY);
+    
 
-    vector<Point2f> currentPoints = initialPoints;
-    vector<float> totalMovement(initialPoints.size(), 0.0f);
-    vector<bool> pointIsLost(initialPoints.size(), false);
+    vector<Point2f> pointsFirst, pointsMid; //contain points tracked in the frames we consider
 
-    // 2. Track points across the sequence using Lucas-Kanade
-    for (int i = 1; i < frames.size(); i++) {
-        Mat currentGray;
-        cvtColor(frames[i], currentGray, COLOR_BGR2GRAY);
+    goodFeaturesToTrack(grayFirst, pointsFirst, 1500, 0.005, 3, Mat(), 3, true, 0.03); //Shi-Tomasi corner detection in first frame
 
-        vector<Point2f> nextPoints;
-        vector<uchar> status;
-        vector<float> err;
+     if (pointsFirst.empty()) { //no points tracked
+        return Rect(0, 0, 0, 0);
+    }
 
-        calcOpticalFlowPyrLK(prevGray, currentGray, currentPoints, nextPoints, status, err);
+    //now calculate optical flow 
 
-        for (int k = 0; k < currentPoints.size(); k++) {
-            if (status[k] == 1 && !pointIsLost[k]) {
-                // Measure how much the point moved in this step
-                float stepDist = norm(nextPoints[k] - currentPoints[k]);
-                totalMovement[k] += stepDist;
-                
-                // Update position for the next frame
-                currentPoints[k] = nextPoints[k];
-            } else {
-                pointIsLost[k] = true; 
+    vector<uchar> status; 
+    vector<float> err; 
+    TermCriteria criteria(TermCriteria::COUNT + TermCriteria::EPS, 30, 0.01);
+    calcOpticalFlowPyrLK(grayFirst, grayMid, pointsFirst, pointsMid, status, err,Size(20, 20), 3,criteria);
+
+    vector<Point2f> movingPoints; 
+
+    for (int i = 0; i < pointsFirst.size(); i++) {           
+        if (status[i]) {                                        //for the points tracked, we check how mich they moved
+            float normal = norm(pointsMid[i] - pointsFirst[i]);
+            
+            if (normal > 5.5 && normal < 40) { //if the movement is between 5.5 and 40 pixels, we consider it as motion
+                movingPoints.push_back(pointsFirst[i]);
             }
         }
-        prevGray = currentGray.clone();
     }
 
-    // 3. Filter points that actually moved significantly
-    vector<Point2f> movingPoints;
-    float movementThreshold = 15.0f; 
+    if (movingPoints.size() < 5) { //5 is our lowerbound for motion detection
+        return Rect(0, 0, 0, 0); 
+    }  
 
-    for (int j = 0; j < initialPoints.size(); j++) {
-        if (!pointIsLost[j] && totalMovement[j] > movementThreshold) {
-            // Use the original coordinates from the FIRST frame
-            movingPoints.push_back(initialPoints[j]); 
-        }
-    }
-
-    if (movingPoints.empty()) return Rect();
-
-    // Return the box containing all moving points
-    return boundingRect(movingPoints);
-}
+return boundingRect(movingPoints);}
