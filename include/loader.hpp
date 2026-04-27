@@ -10,6 +10,6 @@ class Loader{
 public: 
     static std::vector<cv::Mat> getImageSequence(const std::string& dataPath);
 
-    static std::string getLabelPath(const std::string& labelsPath, const std::string& type);
+    static std::vector<std::string> getLabelPath(const std::string& labelsPath, const std::string& type);
 };
 #endif

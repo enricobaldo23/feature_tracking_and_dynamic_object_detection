@@ -31,7 +31,7 @@ Rect Utils::readGroundTruth(string filePath) {
 float Utils::computeIoU(Rect prediction, Rect groundTruth) {
 
     if (prediction.area() == 0 || groundTruth.area() == 0) { 
-        return 0.0f; //if one of the rectangles is empty, IoU must be 0
+        return 0; //if one of the rectangles is empty, IoU must be 0
     }
 
     Rect intersectionRect = prediction & groundTruth; //the and operator calculates the intersection
@@ -45,7 +45,7 @@ float Utils::computeIoU(Rect prediction, Rect groundTruth) {
     minus the intersection to avoid double counting.*/
     
     if (totalArea == 0) {
-        return 0.0f; 
+        return 0; 
     }
     return intersectionValue/totalArea; //IoU
 }

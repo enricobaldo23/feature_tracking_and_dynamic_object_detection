@@ -14,10 +14,13 @@ vector<Mat> Loader::getImageSequence(const string& dataPath) { //reads dataset
 
     vector<string> imgFiles; 
     for (const fs::directory_entry& file : fs::directory_iterator(dataPath)) {
-        string extension = file.path().extension().string();
+        
+        /*firstly, need to control if the file is an image or there would 
+        be error when reading the sequence*/
 
-        if (extension == ".jpg" || extension == ".png" || extension == ".jpeg") {
-            imgFiles.push_back(file.path().string()); //we want only images
+    string extension = file.path().extension().string();
+        if (extension == ".jpg" || extension == ".png") {
+            imgFiles.push_back(file.path().string()); 
         }
     }
     sort(imgFiles.begin(), imgFiles.end());   //had some issues with optical flow if images weren't ordered
@@ -26,23 +29,26 @@ vector<Mat> Loader::getImageSequence(const string& dataPath) { //reads dataset
         Mat f = imread(p);
         if (!f.empty()) sequence.push_back(f); 
     }
-
+    
     return sequence;
 }
 
-string Loader::getLabelPath(const string& labelsPath, const string& type) { //reads labels
- 
+vector<string> Loader::getLabelPath(const string& labelsPath, const string& type) { 
+    /*had troubles with the double directories and ground truth for the squirrel, 
+    with only strings, so used vector of strings and the recursive directory iterator from
+    filesystem library*/
+    
+    vector<string> labels;
     string createLabelPath = labelsPath + "/" + type;
 
-    if (fs::exists(createLabelPath)){
-    for (const fs::directory_entry& f : fs::directory_iterator(createLabelPath)) {
-
-            if (f.path().extension() == ".txt"){
-                return f.path().string(); 
-            } 
+    if (fs::exists(createLabelPath)) {
+        for (const fs::directory_entry& entry : fs::recursive_directory_iterator(createLabelPath)) {
+            if (entry.path().extension() == ".txt") {
+                labels.push_back(entry.path().string());
+            }
         }
     }
-    return "";
+    return labels;
 }
 
    

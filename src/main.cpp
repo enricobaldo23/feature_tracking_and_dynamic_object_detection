@@ -35,13 +35,15 @@ int main() {
     MotionDetector detector;
     Utils utils;
 
-    float totalIoU = 0.0f;
-    int totalCategories = 0; //counter for directories in dataSet
+    float totalIoU = 0;
+    int totalCategories = 0;   //counter for the directories in dataSet
     int correctDetections = 0;  
 
     for (const fs::directory_entry& entry : fs::directory_iterator(dataPath)) {
-        if (!entry.is_directory()) continue; //without this, on MacOS error due to the .DS_store file
 
+        if (!entry.is_directory()) {
+            continue; //without this was giving error on MacOS due to the .DS_store file
+        }
         string category = entry.path().filename().string();
         cout << "object detected: " << category << endl;
 
@@ -55,12 +57,25 @@ int main() {
         Rect detectedRect = detector.detectMovingObject(sequence);
 
     
-        string groundTruthPath = Loader::getLabelPath(labelsPath, category);
-        Rect groundTruthRect = utils.readGroundTruth(groundTruthPath);
+        vector<string> groundTruthPath = Loader::getLabelPath(labelsPath, category);
+        float maxIoU = 0;
+        Rect groundTruthRect;
         
-        float currentIoU = utils.computeIoU(detectedRect, groundTruthRect);
-            cout << "IoU corrente: " << (currentIoU * 100.0f) << "%" << endl;
-            if (currentIoU > 0.5f) {
+        /*if there are different ground truth files, like in the squirrel case we need to consider the 
+        ground truth values with the highest IoU */
+        for (const string& path : groundTruthPath) {
+             Rect currentGroundTruth = utils.readGroundTruth(path);
+             float currentIoU = utils.computeIoU(detectedRect, currentGroundTruth);
+    
+                if (currentIoU >= maxIoU) {
+                maxIoU = currentIoU;
+                groundTruthRect = currentGroundTruth;
+                    }               
+        }
+        
+        float currentIoU = maxIoU;
+            cout << "IoU: " << (currentIoU * 100) << "%" << endl;
+            if (currentIoU > 0.5) {
             correctDetections++;
             }
         int xmin = detectedRect.x;
@@ -72,31 +87,32 @@ int main() {
         totalIoU = totalIoU + currentIoU;
         totalCategories++;
 
-        Mat showImage = sequence[0].clone(); //we show the rectangles on the first frame of the sequence
+        Mat showImage = sequence[0].clone(); //we show in output the rectangles
+                                            //on the first frame of the sequence
 
         rectangle(showImage, detectedRect, Scalar(0, 255, 0), 2); // green for the prediction
         rectangle(showImage, groundTruthRect, Scalar(0, 0, 255), 1); //red fot the ground truth
 
         imshow("Result: " + category, showImage);
         
-        cout << "  (Press any key for next category...)" << endl;
+        cout << "Give any input for next category..." << endl;
         waitKey(0); 
         destroyAllWindows(); 
     }
 
     outFile.close();
 
-    if (totalCategories == 0) {
+    if (totalCategories == 0) {                     //control if there is no input, because
         cout << "No categories processed." << endl; //can't divide by zero for the median IoU
         return 0;
     }
 
-    float mIoU = (totalIoU / totalCategories) * 100.0f;
-    float detectionAccuracy = (static_cast<float>(correctDetections) / totalCategories) * 100.0f;
+    float mIoU = (totalIoU / totalCategories) * 100;
+    float detectionAccuracy = (float(correctDetections)/ totalCategories) * 100; //without cast was always 0 
 
-    cout << "mIoU: " << mIoU << "%" << endl;
+    cout << "median IoU: " << mIoU << "%" << endl;
     cout << "Detection Accuracy: " << detectionAccuracy << "% (" << correctDetections << "/" << totalCategories << ")" << endl;
-    cout << "Coordinates saved to: " << outputPath << endl;
+    cout << "Values saved to: " << outputPath << endl;
 
     return 0;
 }

@@ -12,9 +12,9 @@ Rect MotionDetector::detectMovingObject(vector<Mat> frames) {
         return Rect(0, 0, 0, 0); //if we have only one frame we can't detect motion
     }
 
-    Mat grayFirst, grayMid; //we consider the first and middle frame
+    Mat grayFirst, grayMid; //we decide to consider the first and middle frame
 
-    cvtColor(frames.front(), grayFirst, COLOR_BGR2GRAY);       //convert in grayscale
+    cvtColor(frames.front(), grayFirst, COLOR_BGR2GRAY);       
     cvtColor(frames[frames.size()/2], grayMid, COLOR_BGR2GRAY);
     
 
@@ -26,7 +26,8 @@ Rect MotionDetector::detectMovingObject(vector<Mat> frames) {
         return Rect(0, 0, 0, 0);
     }
 
-    //now calculate optical flow 
+    /*after the corner detection, we use Lucas-Kanade method for the optical flow, 
+    this combo was the one I tried with the best results*/
 
     vector<uchar> status; 
     vector<float> err; 
@@ -36,7 +37,7 @@ Rect MotionDetector::detectMovingObject(vector<Mat> frames) {
     vector<Point2f> movingPoints; 
 
     for (int i = 0; i < pointsFirst.size(); i++) {           
-        if (status[i]) {                                        //for the points tracked, we check how mich they moved
+        if (status[i]) {                            //for the points tracked, check how mich they moved
             float normal = norm(pointsMid[i] - pointsFirst[i]);
             
             if (normal > 5.5 && normal < 40) { //if the movement is between 5.5 and 40 pixels, we consider it as motion
